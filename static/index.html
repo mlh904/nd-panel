@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#f6f3ec">
+<title>茉莉音乐控制台</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- 线条茉莉花：八瓣、金蕊、绿茎叶，全站共用 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="jasmine">
+      <g class="petals">
+        <g><ellipse class="petal" style="--i:0" cx="50" cy="31" rx="12.5" ry="16"/></g>
+        <g transform="rotate(40 50 50)"><ellipse class="petal" style="--i:1" cx="50" cy="31" rx="12.5" ry="16"/></g>
+        <g transform="rotate(80 50 50)"><ellipse class="petal" style="--i:2" cx="50" cy="31" rx="12.5" ry="16"/></g>
+        <g transform="rotate(120 50 50)"><ellipse class="petal" style="--i:3" cx="50" cy="31" rx="12.5" ry="16"/></g>
+        <g transform="rotate(160 50 50)"><ellipse class="petal" style="--i:4" cx="50" cy="31" rx="12.5" ry="16"/></g>
+        <g transform="rotate(200 50 50)"><ellipse class="petal" style="--i:5" cx="50" cy="31" rx="12.5" ry="16"/></g>
+        <g transform="rotate(240 50 50)"><ellipse class="petal" style="--i:6" cx="50" cy="31" rx="12.5" ry="16"/></g>
+        <g transform="rotate(280 50 50)"><ellipse class="petal" style="--i:7" cx="50" cy="31" rx="12.5" ry="16"/></g>
+        <g transform="rotate(320 50 50)"><ellipse class="petal" style="--i:8" cx="50" cy="31" rx="12.5" ry="16"/></g>
+        <g transform="rotate(20 50 50)"><ellipse class="petal inner" style="--i:9" cx="50" cy="38" rx="8" ry="10"/></g>
+        <g transform="rotate(110 50 50)"><ellipse class="petal inner" style="--i:10" cx="50" cy="38" rx="8" ry="10"/></g>
+        <g transform="rotate(200 50 50)"><ellipse class="petal inner" style="--i:11" cx="50" cy="38" rx="8" ry="10"/></g>
+        <g transform="rotate(290 50 50)"><ellipse class="petal inner" style="--i:12" cx="50" cy="38" rx="8" ry="10"/></g>
+      </g>
+      <circle class="heart" cx="50" cy="50" r="5.6"/>
+      <circle class="heart-dot" cx="50" cy="50" r="2"/>
+    </g>
+  </defs>
+</svg>
+
+<div id="login" class="login-wrap">
+  <form class="login-card" id="loginForm">
+    <span class="ribbon" aria-hidden="true"></span>
+    <span class="frame" aria-hidden="true"><i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i></span>
+    <div class="bloom" aria-hidden="true">
+      <svg viewBox="0 0 100 118" class="bloom-svg">
+        <path class="stem" d="M50 62 C 49 82, 51 96, 50 112"/>
+        <path class="leaf leaf-l" d="M50 92 C 36 93, 25 85, 21 72 C 37 69, 47 78, 50 92 Z"/>
+        <path class="leaf leaf-r" d="M50 92 C 64 93, 75 85, 79 72 C 63 69, 53 78, 50 92 Z"/>
+        <use href="#jasmine"/>
+      </svg>
+    </div>
+    <h1>茉莉音乐</h1>
+    <p class="sub">我的心已经等你好多年</p>
+    <div class="rule" aria-hidden="true"><i></i><b></b><i></i></div>
+    <label>账号<input id="lu" autocomplete="username" required></label>
+    <label>密码<input id="lp" type="password" autocomplete="current-password" required></label>
+    <button type="submit" id="loginBtn" class="primary">登录</button>
+    <div class="err" id="loginErr" role="alert"></div>
+    <p class="colophon">JASMINE MUSIC</p>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <aside class="side">
+    <div class="brand">
+      <svg class="brand-flower" viewBox="0 0 100 100" aria-hidden="true"><use href="#jasmine"/></svg>
+      <span class="brand-name">茉莉音乐<small>JASMINE MUSIC</small></span>
+    </div>
+    <nav>
+      <a data-page="overview" class="on">概览</a>
+      <a data-page="request">求歌</a>
+      <a data-page="playlist">歌单</a>
+      <a data-page="users" class="admin-only">用户</a>
+      <a data-page="plays">播放</a>
+      <a data-page="review" class="admin-only">审核</a>
+      <a data-page="servers" class="admin-only">线路</a>
+      <a data-page="audit" class="admin-only">日志</a>
+    </nav>
+    <div class="side-foot">
+      <span id="meName"></span>
+      <button id="logoutBtn">退出</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="top">
+      <h2 id="pageTitle">概览</h2>
+      <button id="refreshBtn" class="ghost">刷新</button>
+    </header>
+
+    <section id="page-overview" class="page on">
+      <div class="cards" id="statCards"></div>
+      <h3>播放概览<div class="h3-act"><button id="healthBtn" class="ghost">运行自检</button></div></h3>
+      <div id="ovPlays"></div>
+      <h3>服务器状态</h3>
+      <div id="serverList" class="server-list"></div>
+    </section>
+
+    <!-- 求歌 -->
+    <section id="page-request" class="page">
+      <div class="quota-bar" id="songQuota"></div>
+      <div class="tabs" id="reqTabs">
+        <button data-p="netease" class="on">网易云</button>
+        <button data-p="qq">QQ音乐</button>
+        <button data-p="kugou">酷狗</button>
+        <button data-p="kuwo">酷我</button>
+      </div>
+      <div class="search-bar">
+        <input id="reqKw" placeholder="输入歌名或歌手，回车搜索">
+        <button class="primary" id="reqSearch">搜索</button>
+      </div>
+      <div class="suggest" id="reqSuggest"></div>
+      <div id="reqResults"></div>
+    </section>
+
+    <!-- 歌单 -->
+    <section id="page-playlist" class="page">
+      <div class="quota-bar" id="plQuota"></div>
+      <div class="search-bar">
+        <input id="plUrl" placeholder="粘贴歌单链接（支持网易云 / QQ音乐 / 酷狗 / 酷我）">
+        <button class="primary" id="plSubmit">提交</button>
+      </div>
+      <div class="hint">
+        把歌单链接发给管理员，审核通过后管理员会帮你加入到曲库。<br>
+        系统会自动识别画平台，不需要填歌单名。
+      </div>
+      <div id="plResult"></div>
+    </section>
+
+    <section id="page-users" class="page">
+      <div class="toolbar">
+        <input id="userSearch" placeholder="搜索用户名…">
+        <span id="userCount" class="muted"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="userTable">
+          <thead><tr><th>用户名</th><th>昵称</th><th>权限</th><th>所在服务器</th><th>操作</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="page-review" class="page">
+      <h3>求歌</h3>
+      <div class="batch-bar" id="reqBatchBar">
+        <label class="chk"><input type="checkbox" id="reqSelAll"> 全选</label>
+        <span class="muted" id="reqSelCount">已选 0</span>
+        <button data-k="request" data-s="approved" class="batch-act">批量通过</button>
+        <button data-k="request" data-s="uploaded" class="batch-act">标为已上传</button>
+        <button data-k="request" data-s="rejected" class="batch-act danger">批量拒绝</button>
+        <button data-k="request" data-del="1" class="batch-act danger">批量删除</button>
+      </div>
+      <div class="table-wrap"><table id="reqTable">
+        <thead><tr><th style="width:38px"><input type="checkbox" id="reqHead"></th><th>时间</th><th>用户</th><th>歌曲</th><th>票数</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody></tbody></table></div>
+
+      <h3>歌单</h3>
+      <div class="batch-bar" id="plBatchBar">
+        <label class="chk"><input type="checkbox" id="plSelAll"> 全选</label>
+        <span class="muted" id="plSelCount">已选 0</span>
+        <button data-k="playlist" data-s="approved" class="batch-act">批量通过</button>
+        <button data-k="playlist" data-s="uploaded" class="batch-act">标为已上传</button>
+        <button data-k="playlist" data-s="rejected" class="batch-act danger">批量拒绝</button>
+        <button data-k="playlist" data-del="1" class="batch-act danger">批量删除</button>
+      </div>
+      <div class="table-wrap"><table id="plTable">
+        <thead><tr><th style="width:38px"><input type="checkbox" id="plHead"></th><th>时间</th><th>用户</th><th>歌单链接</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody></tbody></table></div>
+    </section>
+
+    <section id="page-servers" class="page">
+      <div id="serverDetail" class="server-list"></div>
+    </section>
+
+    <section id="page-plays" class="page">
+      <div id="playsBody"></div>
+    </section>
+
+    <section id="page-audit" class="page">
+      <div class="table-wrap"><table id="auditTable">
+        <thead><tr><th>时间</th><th>操作人</th><th>动作</th><th>对象</th><th>详情</th></tr></thead>
+        <tbody></tbody></table></div>
+    </section>
+  </main>
+</div>
+
+
+<!-- 登录成功后的翻书过场 -->
+<div id="bookScene" class="book-scene hidden" aria-hidden="true">
+  <div class="book">
+    <div class="leaf-page">
+      <span class="frame"><i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i></span>
+      <svg class="page-flower" viewBox="0 0 100 100"><use href="#jasmine"/></svg>
+      <p class="page-title">概览</p>
+      <p class="page-sub">一册花香，静待聆听</p>
+    </div>
+    <div class="cover">
+      <div class="cover-front">
+        <span class="frame"><i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i></span>
+        <svg class="cover-flower" viewBox="0 0 100 100"><use href="#jasmine"/></svg>
+        <h2>茉莉音乐</h2>
+        <p>JASMINE MUSIC</p>
+      </div>
+      <div class="cover-back"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status"></div>
+<script src="/app.js"></script>
+</body>
+</html>

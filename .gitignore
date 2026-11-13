@@ -1,0 +1,13 @@
+# 运行时数据与密钥，绝不入库
+data/
+secrets/*
+!secrets/README.md
+*.db
+*.db-journal
+*.bak
+*.bak-*
+*.old
+__pycache__/
+*.pyc
+.env
+.env.local

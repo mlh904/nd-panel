@@ -1,0 +1,31 @@
+services:
+  nd-panel:
+    image: python:3.11-slim
+    container_name: nd-panel
+    restart: always
+    working_dir: /app
+    command: ["sh", "-c", "pip install --no-cache-dir -q pymongo==4.9.1 2>/dev/null || true; exec python /app/app.py"]
+    ports:
+      - "${PANEL_PORT:-3010}:3010"
+    environment:
+      PORT: "3010"
+      DATA_DIR: "/app/data"
+      ND_ADMIN_USER: "${ND_ADMIN_USER:-botadmin}"
+      ND_ADMIN_PASS_FILE: "/run/secrets/nd_botadmin_pass"
+      TG_TOKEN_FILE: "/run/secrets/tg_token"
+      MONGO_URL_FILE: "/run/secrets/mongo_url"
+      # 统计代理地址，JSON 数组：[{"name":"...","url":"http://host:3999"}]
+      ND_STATS_SERVERS: "${ND_STATS_SERVERS:-[]}"
+      # Navidrome 线路地址，JSON 数组：[{"name":"...","url":"http://host:4533"}]
+      ND_SERVERS: "${ND_SERVERS:-[]}"
+    volumes:
+      - ./app.py:/app/app.py:ro
+      - ./music_search.py:/app/music_search.py:ro
+      - ./static:/app/static:ro
+      - ./data:/app/data
+      - ./secrets:/run/secrets:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:3010/',timeout=4)\""]
+      interval: 30s
+      timeout: 8s
+      retries: 3
