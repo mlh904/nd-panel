@@ -4,6 +4,8 @@ import json
 import re
 import urllib.parse
 import urllib.request
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")
@@ -27,6 +29,79 @@ def _post(url, data, headers=None, timeout=15):
         return r.read().decode("utf-8", "ignore")
 
 
+# ---------------- 封面 ----------------
+# 统一目标：https（页面是 https，http 图会被浏览器静默拦截）、约 200px、失败就留空。
+_PIC_CACHE = {}
+_PIC_TTL = 6 * 3600
+
+
+def _pic(url, suffix=""):
+    """把封面地址统一成 https，并按需加缩放参数。"""
+    if not url:
+        return ""
+    u = url.strip()
+    if u.startswith("//"):
+        u = "https:" + u
+    elif u.startswith("http://"):
+        u = "https://" + u[7:]
+    return u + suffix
+
+
+def _kuwo_cover(short):
+    """酷我 web_albumpic_short 形如 120/75/54/xxx.jpg，首段是尺寸，换成 500 得大图。"""
+    if not short:
+        return ""
+    parts = short.split("/")
+    if len(parts) == 4:
+        parts[0] = "500"
+    return "https://img4.kuwo.cn/star/albumcover/" + "/".join(parts)
+
+
+def _kugou_cover(album_id):
+    """酷狗搜索不带封面，要靠 album_id 查 album/info 的 imgurl（{size} 占位）。"""
+    if not album_id or str(album_id) == "0":
+        return ""
+    key = "kg:%s" % album_id
+    hit = _PIC_CACHE.get(key)
+    if hit and time.time() - hit[0] < _PIC_TTL:
+        return hit[1]
+    val = ""
+    try:
+        u = ("http://mobilecdn.kugou.com/api/v3/album/info?albumid=%s" % album_id)
+        d = json.loads(_get(u, {"Referer": "https://www.kugou.com/"}, timeout=8))
+        img = (d.get("data") or {}).get("imgurl") or ""
+        if img:
+            val = img.replace("{size}", "240")
+            # 酷狗图床是 http，浏览器在 https 页面会拦，必须换 https
+            val = _pic(val)
+    except Exception:
+        val = ""
+    _PIC_CACHE[key] = (time.time(), val)
+    return val
+
+
+def _fill_covers(items, getter, key="_album_id"):
+    """并发补齐封面。单条失败不影响整体，超时就跳过。"""
+    todo = [it for it in items if it.get(key)]
+    if not todo:
+        return
+    try:
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            futs = {ex.submit(getter, it.get(key)): it for it in todo}
+            for f in as_completed(futs, timeout=12):
+                it = futs[f]
+                try:
+                    it["cover"] = f.result() or ""
+                except Exception:
+                    it["cover"] = ""
+    except Exception:
+        pass
+    for it in items:
+        it.setdefault("cover", "")
+        it.pop(key, None)
+
+
+
 def _jsonp(text):
     t = (text or "").strip()
     if t.startswith("callback(") and t.endswith(")"):
@@ -39,19 +114,22 @@ def _jsonp(text):
 
 # ---------------- 搜索 ----------------
 def search_netease(kw, limit=20):
-    u = ("https://music.163.com/api/search/get?s=%s&type=1&limit=%d"
+    u = ("https://music.163.com/api/cloudsearch/pc?s=%s&type=1&limit=%d&offset=0"
          % (urllib.parse.quote(kw), limit))
     d = json.loads(_get(u, {"Referer": "https://music.163.com/"}))
     songs = (d.get("result") or {}).get("songs") or []
     out = []
     for s in songs:
+        al = s.get("al") or {}
         out.append({
             "platform": "netease",
             "song_id": str(s.get("id")),
             "title": s.get("name") or "",
-            "artist": "/".join(a.get("name", "") for a in (s.get("artists") or [])),
-            "album": (s.get("album") or {}).get("name") or "",
-            "duration": s.get("duration") or 0,
+            "artist": "/".join(a.get("name", "") for a in (s.get("ar") or [])),
+            "album": al.get("name") or "",
+            "duration": s.get("dt") or 0,
+            # 网易云图片本身就是 https，?param 让它按 200x200 返回，省流量
+            "cover": _pic(al.get("picUrl")) + ("?param=200y200" if al.get("picUrl") else ""),
         })
     return out
 
@@ -70,6 +148,8 @@ def search_qq(kw, limit=20):
             "artist": "/".join(x.get("name", "") for x in (s.get("singer") or [])),
             "album": s.get("albumname") or "",
             "duration": (s.get("interval") or 0) * 1000,
+            "cover": ("https://y.qq.com/music/photo_new/T002R300x300M000"
+                      + str(s.get("albummid")) + ".jpg") if s.get("albummid") else "",
         })
     return out
 
@@ -84,11 +164,14 @@ def search_kugou(kw, limit=20):
         out.append({
             "platform": "kugou",
             "song_id": s.get("hash") or "",
+            "_album_id": s.get("album_id") or "",
             "title": s.get("songname") or "",
             "artist": s.get("singername") or "",
             "album": s.get("album_name") or "",
             "duration": (s.get("duration") or 0) * 1000,
         })
+    # 搜索接口不带封面，靠 album_id 二次查询；并发查但结果缓存
+    _fill_covers(out, _kugou_cover)
     return out
 
 
@@ -112,6 +195,8 @@ def search_kuwo(kw, limit=20):
             "artist": (s.get("ARTIST") or "").replace("&nbsp;", " ").strip(),
             "album": (s.get("ALBUM") or "").replace("&nbsp;", " ").strip(),
             "duration": 0,
+            # short 形如 120/75/54/xxx.jpg，第一段是尺寸，换成 500 得大图
+            "cover": _kuwo_cover(s.get("web_albumpic_short")),
         })
     return out
 

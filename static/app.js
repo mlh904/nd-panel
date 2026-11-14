@@ -439,6 +439,10 @@ async function doSearch() {
     box.innerHTML = res.map((r, i) => `
       <div class="song-row">
         <span class="idx">${i + 1}</span>
+        ${r.cover
+          ? `<img class="cov" src="${esc(r.cover)}" alt="" loading="lazy" decoding="async"
+                  referrerpolicy="no-referrer" onerror="this.classList.add('cov-fail')">`
+          : `<span class="cov cov-none" aria-hidden="true"></span>`}
         <div class="info">
           <div class="t">${esc(r.title)}</div>
           <div class="a">${esc(r.artist)}${r.album ? ' · ' + esc(r.album) : ''}</div>
