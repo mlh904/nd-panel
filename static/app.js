@@ -514,6 +514,54 @@ const ST = {
   uploaded: ['已上传', 'ok'], rejected: ['已拒绝', 'bad']
 };
 
+/* 审核页筛选：todo = 未上传（待审核 + 已通过 + 已拒绝） */
+let REQ_FILTER = 'todo', PL_FILTER = 'todo';
+
+function passFilter(row, f) {
+  if (f === 'all') return true;
+  if (f === 'todo') return row.status !== 'uploaded';
+  return row.status === f;
+}
+
+function applyFilter(rows, f) {
+  return rows.filter(r => passFilter(r, f));
+}
+
+/* 审核页空状态：区分「本来没有」和「筛选后没有」 */
+function emptyReviewRow(colspan, kind, f) {
+  const isReq = kind === 'request';
+  const total = isReq ? REQ_ROWS.length : PL_ROWS.length;
+  const label = isReq ? '求歌' : '歌单';
+  let msg;
+  if (f === 'todo') {
+    msg = `所有${label}都已上传，没有待处理的`;
+  } else if (f === 'all') {
+    msg = `还没有人提交${label}`;
+  } else {
+    msg = `没有「${(ST[f] && ST[f][0]) || f}」的${label}`;
+  }
+  const hint = total && f !== 'all'
+    ? ` <button class="ghost" data-f="all" data-kind="${kind}">看全部 ${total} 条</button>` : '';
+  return `<tr><td colspan="${colspan}" class="muted review-empty">
+    <div class="re-t">${msg}</div>${hint}</td></tr>`;
+}
+
+/* 筛选条上的计数：todo/all 之外按状态计；todo = 未上传总数 */
+function paintFilterBar(barId, rows) {
+  const bar = $('#' + barId);
+  if (!bar) return;
+  const cnt = { all: rows.length, todo: rows.filter(r => r.status !== 'uploaded').length };
+  ['pending', 'approved', 'rejected', 'uploaded'].forEach(k => {
+    cnt[k] = rows.filter(r => r.status === k).length;
+  });
+  $$('#' + barId + ' button').forEach(b => {
+    const n = cnt[b.dataset.f] || 0;
+    const fc = b.querySelector('.fc');
+    if (fc) fc.textContent = n;
+    b.classList.toggle('empty', n === 0 && b.dataset.f !== 'all');
+  });
+}
+
 async function loadReview() {
   try {
     const d = await api('/api/requests');
@@ -527,7 +575,13 @@ async function loadReview() {
 }
 
 function renderReqTable() {
-  $('#reqTable tbody').innerHTML = REQ_ROWS.map(r => `
+  const rows = applyFilter(REQ_ROWS, REQ_FILTER);
+  paintFilterBar('reqFilter', REQ_ROWS);
+  if (!rows.length) {
+    $('#reqTable tbody').innerHTML = emptyReviewRow(7, 'request', REQ_FILTER);
+    return;
+  }
+  $('#reqTable tbody').innerHTML = rows.map(r => `
     <tr>
       <td><input type="checkbox" class="rowchk" data-k="request" data-id="${r.id}"></td>
       <td data-l="时间" class="cell-time">${fmtTime(r.ts)}</td>
@@ -540,11 +594,17 @@ function renderReqTable() {
         <button data-k="request" data-id="${r.id}" data-s="uploaded">已上传</button>
         <button data-k="request" data-id="${r.id}" data-s="rejected" class="danger">拒绝</button>
       </div></td>
-    </tr>`).join('') || '<tr><td colspan="7" class="muted" style="padding:22px">暂无求歌</td></tr>';
+    </tr>`).join('');
 }
 
 function renderPlTable() {
-  $('#plTable tbody').innerHTML = PL_ROWS.map(p => {
+  const prow = applyFilter(PL_ROWS, PL_FILTER);
+  paintFilterBar('plFilter', PL_ROWS);
+  if (!prow.length) {
+    $('#plTable tbody').innerHTML = emptyReviewRow(6, 'playlist', PL_FILTER);
+    return;
+  }
+  $('#plTable tbody').innerHTML = prow.map(p => {
     const link = p.note || '';
     const show = link
       ? `<a href="${esc(link)}" target="_blank" rel="noopener">${esc(shortUrl(link))}</a>`
@@ -562,7 +622,7 @@ function renderPlTable() {
         <button data-k="playlist" data-id="${p.id}" data-s="rejected" class="danger">拒绝</button>
       </div></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="6" class="muted" style="padding:22px">暂无歌单</td></tr>';
+  }).join('');
 }
 
 function shortUrl(u) {
@@ -572,6 +632,30 @@ function shortUrl(u) {
     return o.hostname.replace('www.', '') + (id ? ' / ' + id : '');
   } catch (e) { return u.slice(0, 40); }
 }
+
+/* 筛选条：切换时清空勾选，避免误操作到隐藏行 */
+document.addEventListener('click', e => {
+  const b = e.target.closest('.filter-bar button, .review-empty button[data-f]');
+  if (!b || !b.dataset.f) return;
+  const bar = b.closest('.filter-bar');
+  const kind = b.dataset.kind || (bar && bar.id === 'plFilter' ? 'playlist' : 'request');
+  const f = b.dataset.f;
+  if (kind === 'request') { REQ_FILTER = f; } else { PL_FILTER = f; }
+  if (bar) {
+    $$('#' + bar.id + ' button').forEach(x => x.classList.toggle('on', x.dataset.f === f));
+  } else {
+    const bid = kind === 'request' ? '#reqFilter' : '#plFilter';
+    $$(bid + ' button').forEach(x => x.classList.toggle('on', x.dataset.f === f));
+  }
+  // 清空该类勾选
+  $$(`.rowchk[data-k="${kind}"]`).forEach(c => { c.checked = false; });
+  const h = $(kind === 'request' ? '#reqHead' : '#plHead');
+  const a = $(kind === 'request' ? '#reqSelAll' : '#plSelAll');
+  if (h) h.checked = false;
+  if (a) a.checked = false;
+  updateSel(kind);
+  if (kind === 'request') renderReqTable(); else renderPlTable();
+});
 
 /* 单选操作 */
 $('#page-review').addEventListener('click', async e => {

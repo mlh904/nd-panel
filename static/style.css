@@ -301,6 +301,45 @@ tbody tr:hover{background:var(--surface-hover)}
   .song-row .idx{width:18px;font-size:12px}
 }
 
+/* ---------------- 审核筛选条 ---------------- */
+.filter-bar{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.filter-bar button{border-radius:9px;padding:5px 12px 5px 13px;font-size:12.5px;
+  background:var(--card);color:var(--ink-2);border:1px solid var(--line);
+  display:inline-flex;align-items:center;gap:6px;transition:all .18s var(--ease)}
+.filter-bar button:hover{background:var(--surface-hover);border-color:var(--line-hover);
+  transform:translateY(-1px)}
+/* 计数：小号衬线数字，像标签上的编号 */
+.filter-bar .fc{font-family:var(--serif);font-size:11px;font-variant-numeric:tabular-nums;
+  color:var(--muted);background:var(--surface-sink);border-radius:5px;
+  padding:0 5px;line-height:16px;min-width:18px;text-align:center}
+.filter-bar button.on{background:var(--green);border-color:var(--green);color:#fff;
+  font-weight:600;box-shadow:0 3px 10px -4px rgba(58,72,128,.45)}
+.filter-bar button.on .fc{background:rgba(255,255,255,.24);color:#fff}
+/* 计数为 0 的项淡出，避免视觉噪音 */
+.filter-bar button.empty{opacity:.52}
+.filter-bar button.on.empty{opacity:1}
+
+/* 审核页空状态 */
+.review-empty{padding:26px 22px;text-align:center;line-height:1.8}
+.review-empty .re-t{font-size:13.5px}
+.review-empty button.ghost{margin-left:6px;padding:3px 12px;font-size:12.5px;
+  border-radius:8px;vertical-align:middle}
+
+/* 手机端：两行网格铺满，不横滚——横滚会把「已上传」藏到屏外，
+   而它正是最想看的项。计数为 0 的项在窄屏隐藏，进一步省地方。 */
+@media(max-width:760px){
+  .filter-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;
+    overflow:visible;padding-bottom:0}
+  .filter-bar button{flex:none;width:100%;justify-content:center;
+    padding:6px 4px;font-size:12px;gap:5px}
+  .filter-bar .fc{font-size:10px;min-width:16px;padding:0 4px;line-height:15px}
+  /* 窄屏隐藏空项：6 个挤不下，空的最没价值 */
+  .filter-bar button.empty:not(.on){display:none}
+}
+@media(max-width:420px){
+  .filter-bar{grid-template-columns:repeat(2,1fr)}
+}
+
 /* ---------------- 空状态 ---------------- */
 .empty{text-align:center;padding:52px 20px;color:var(--muted);font-size:13.5px}
 .empty::before{content:"";display:block;width:40px;height:40px;margin:0 auto 14px;
